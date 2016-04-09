@@ -12,6 +12,7 @@ description: > # this means to ignore newlines until "baseurl:"
   A moment in the mind of vanillaike.
 baseurl: "" # the subpath of your site, e.g. /blog
 url: "http://vanillaike.github.io/" # the base hostname & protocol for your site
+url-no-protocol: "vanillaike.github.io"
 
 # Build settings
 markdown: kramdown
