@@ -9,6 +9,9 @@
         <p>{{ site.description }}</p>
       </div>
       <div class="footer-col footer-col-2">
+          <p class="rss-subscribe">subscribe <a href="{{ "/feed.xml" | prepend: site.baseurl }}">via RSS</a></p>
+      </div>
+      <div class="footer-col footer-col-3">
         <ul class="social-media-list">
           {% if site.github_username %}
           <li>
