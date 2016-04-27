@@ -6,3 +6,9 @@
     position: relative;
     top: -25px;
 }
+
+.site-title{
+    &:hover{
+        text-decoration: none;
+    }
+}
