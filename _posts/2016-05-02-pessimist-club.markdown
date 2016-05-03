@@ -1,7 +1,7 @@
 ---
 layout: post
 title:  "Come join the pessimist club!"
-date:   2016-05-02 19:10:00 -0500
+date:   2016-05-02 19:10:00 -1100
 categories: pessimist-club
 comments: true
 ---
