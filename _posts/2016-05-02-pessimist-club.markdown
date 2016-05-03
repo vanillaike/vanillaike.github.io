@@ -1,7 +1,7 @@
 ---
 layout: post
 title:  "Come join the pessimist club!"
-date:   2016-05-02 19:10:00 -1100
+date:   2016-05-02 19:10:00 -0500
 categories: pessimist-club
 comments: true
 ---
@@ -15,6 +15,6 @@ Imagine the softball games we could play. Sure we'd more than likely lose, we're
 
 Who would make the best chili for the annual chili cookoff? Who knows but the trophy isn't very shiny and it's too small to show off. Plus the optimists probably put beans in their chili (gross).
 
-As members of the Pesimist Club we would do a lot of reaching out to help people. Who knows what kind of damage we'd do. Wouldn't we do more harm than good anyway?
+As members of the Pessimist Club we would do a lot of reaching out to help people. Who knows what kind of damage we'd do. Wouldn't we do more harm than good anyway?
 
 I've often thought about actually setting up a Pessimist Club, but never have because I figured no one would join. I guess that's why I'm the leader.
