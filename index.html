@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#4285F4">
-    <title>Location Mapper</title>
+    <title>IB Wandering</title>
     <link rel="manifest" href="manifest.json">
     <style>
         * {
@@ -214,6 +214,8 @@
             document.getElementById('start-tracking').addEventListener('click', startTracking);
             document.getElementById('pause-tracking').addEventListener('click', pauseTracking);
             document.getElementById('stop-tracking').addEventListener('click', stopTracking);
+            document.getElementById('save-track').addEventListener('click', saveTrackData);
+            document.getElementById('discard-track').addEventListener('click', discardTrack);
             
             // Load saved pins from local storage
             loadSavedPins();
@@ -530,7 +532,6 @@
 
         // Start tracking the user's location
         function startTracking() {
-            alert("is tracking:", isTracking )
             if (isTracking) return;
             
             isTracking = true;
@@ -837,6 +838,12 @@
                     });
             });
         }
+    </script>
+    <script>
+        // Check for API key on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            checkForApiKey();
+        });
     </script>
 </body>
 </html>
