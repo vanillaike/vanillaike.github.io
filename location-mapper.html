@@ -112,6 +112,10 @@
         <button id="current-location">Get My Location</button>
         <button id="add-pin">Add New Pin</button>
         <button id="clear-pins">Clear All Pins</button>
+        <div id="api-key-container">
+            <input type="text" id="api-key-input" placeholder="Enter Google Maps API Key">
+            <button id="save-api-key">Save Key</button>
+        </div>
     </div>
     
     <div id="map"></div>
@@ -177,6 +181,7 @@
             document.getElementById('clear-pins').addEventListener('click', clearAllPins);
             document.getElementById('save-pin').addEventListener('click', savePinData);
             document.getElementById('cancel-pin').addEventListener('click', cancelAddPin);
+            document.getElementById('save-api-key').addEventListener('click', saveApiKey);
             
             // Load saved pins from local storage
             loadSavedPins();
@@ -405,6 +410,48 @@
                 
                 markers.push(marker);
             });
+        }
+
+        // Save API key to local storage
+        function saveApiKey() {
+            const apiKey = document.getElementById('api-key-input').value.trim();
+            if (apiKey) {
+                localStorage.setItem('googleMapsApiKey', apiKey);
+                loadGoogleMapsApi(apiKey);
+                document.getElementById('api-key-container').style.display = 'none';
+            } else {
+                alert('Please enter a valid API key');
+            }
+        }
+
+        // Load Google Maps API with the provided key
+        function loadGoogleMapsApi(apiKey) {
+            // Remove any existing script to prevent duplicates
+            const existingScript = document.querySelector('script[src*="maps.googleapis.com/maps/api/js"]');
+            if (existingScript) {
+                existingScript.remove();
+            }
+            
+            // Create and append the new script
+            const script = document.createElement('script');
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&callback=initMap`;
+            script.async = true;
+            script.defer = true;
+            document.body.appendChild(script);
+        }
+
+        // Check if we have a stored API key and load the map
+        function checkForApiKey() {
+            const storedApiKey = localStorage.getItem('googleMapsApiKey');
+            
+            if (storedApiKey) {
+                // If we have a key, hide the input and load the map
+                document.getElementById('api-key-container').style.display = 'none';
+                loadGoogleMapsApi(storedApiKey);
+            } else {
+                // If no key is stored, show the input
+                document.getElementById('api-key-container').style.display = 'flex';
+            }
         }
     </script>
     
