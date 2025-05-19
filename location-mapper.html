@@ -113,6 +113,10 @@
         <button id="add-pin">Add New Pin</button>
         <button id="add-pin-here">Add Pin at My Location</button>
         <button id="clear-pins">Clear All Pins</button>
+        <!-- Add tracking controls -->
+        <button id="start-tracking" class="tracking-btn">Start Tracking</button>
+        <button id="pause-tracking" class="tracking-btn" style="display: none;">Pause Tracking</button>
+        <button id="stop-tracking" class="tracking-btn" style="display: none;">Stop & Save</button>
         <div id="api-key-container">
             <input type="text" id="api-key-input" placeholder="Enter Google Maps API Key">
             <button id="save-api-key">Save Key</button>
@@ -131,6 +135,22 @@
         </div>
     </div>
 
+    <!-- Add a tracking info display -->
+    <div id="tracking-info" style="display: none; padding: 0.5rem; background-color: #e9f5ff; text-align: center;">
+        Tracking: <span id="tracking-time">00:00:00</span> | Distance: <span id="tracking-distance">0.00</span> km
+    </div>
+
+    <!-- Add a form for saving tracks -->
+    <div id="track-form" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 1rem; border-radius: 8px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2); z-index: 1000;">
+        <h3>Save Your Track</h3>
+        <input type="text" id="track-title" placeholder="Title" maxlength="50">
+        <textarea id="track-description" placeholder="Description (optional)" rows="3" maxlength="200"></textarea>
+        <div>
+            <button id="save-track">Save</button>
+            <button id="discard-track">Discard</button>
+        </div>
+    </div>
+
     <script>
         // Global variables
         let map;
@@ -138,6 +158,13 @@
         let currentPosition = null;
         let tempMarker = null;
         let deferredPrompt;
+        let isTracking = false;
+        let trackPath = [];
+        let trackPolyline = null;
+        let trackTimer = null;
+        let trackStartTime = null;
+        let trackPausedTime = 0;
+        let watchPositionId = null;
 
         // Initialize the application
         function initApp() {
@@ -184,6 +211,9 @@
             document.getElementById('cancel-pin').addEventListener('click', cancelAddPin);
             document.getElementById('save-api-key').addEventListener('click', saveApiKey);
             document.getElementById('add-pin-here').addEventListener('click', addPinAtCurrentLocation);
+            document.getElementById('start-tracking').addEventListener('click', startTracking);
+            document.getElementById('pause-tracking').addEventListener('click', pauseTracking);
+            document.getElementById('stop-tracking').addEventListener('click', stopTracking);
             
             // Load saved pins from local storage
             loadSavedPins();
@@ -496,6 +526,296 @@
             document.getElementById('pin-title').value = '';
             document.getElementById('pin-description').value = '';
             document.getElementById('pin-title').focus();
+        }
+
+        // Start tracking the user's location
+        function startTracking() {
+            alert("is tracking:", isTracking )
+            if (isTracking) return;
+            
+            isTracking = true;
+            
+            // Update UI
+            document.getElementById('start-tracking').style.display = 'none';
+            document.getElementById('pause-tracking').style.display = 'inline';
+            document.getElementById('stop-tracking').style.display = 'inline';
+            document.getElementById('tracking-info').style.display = 'block';
+            
+            // Initialize or reset tracking data
+            if (!trackStartTime) {
+                trackStartTime = new Date();
+                trackPath = [];
+                trackPausedTime = 0;
+            } else {
+                // If resuming, account for paused time
+                trackPausedTime += (new Date() - trackPauseTime);
+            }
+            
+            // Start the timer
+            updateTrackingTimer();
+            trackTimer = setInterval(updateTrackingTimer, 1000);
+            
+            // Start watching position with high accuracy
+            if (navigator.geolocation) {
+                watchPositionId = navigator.geolocation.watchPosition(
+                    trackPosition,
+                    (error) => {
+                        console.error("Error tracking location:", error);
+                        alert("Unable to track your location. Please check your device settings.");
+                        pauseTracking();
+                    },
+                    { 
+                        enableHighAccuracy: true, 
+                        maximumAge: 0, 
+                        timeout: 5000 
+                    }
+                );
+            }
+            
+            // Create polyline if it doesn't exist
+            if (!trackPolyline) {
+                trackPolyline = new google.maps.Polyline({
+                    map: map,
+                    path: trackPath,
+                    strokeColor: '#FF0000',
+                    strokeOpacity: 0.8,
+                    strokeWeight: 3
+                });
+            }
+        }
+        
+        // Pause tracking
+        function pauseTracking() {
+            if (!isTracking) return;
+            
+            isTracking = false;
+            trackPauseTime = new Date();
+            
+            // Update UI
+            document.getElementById('start-tracking').style.display = 'inline';
+            document.getElementById('pause-tracking').style.display = 'none';
+            
+            // Stop the timer and location watching
+            clearInterval(trackTimer);
+            if (watchPositionId !== null) {
+                navigator.geolocation.clearWatch(watchPositionId);
+                watchPositionId = null;
+            }
+        }
+        
+        // Stop tracking and prompt to save
+        function stopTracking() {
+            pauseTracking();
+            
+            // Update UI
+            document.getElementById('stop-tracking').style.display = 'none';
+            document.getElementById('tracking-info').style.display = 'none';
+            
+            // Show save form if we have tracking data
+            if (trackPath.length > 1) {
+                document.getElementById('track-form').style.display = 'block';
+            } else {
+                alert("Not enough tracking data to save. Try tracking for a longer period.");
+                resetTracking();
+            }
+        }
+        
+        // Track the current position
+        function trackPosition(position) {
+            const newPoint = {
+                lat: position.coords.latitude,
+                lng: position.coords.longitude,
+                timestamp: new Date().getTime(),
+                accuracy: position.coords.accuracy
+            };
+            
+            // Only add points that are sufficiently different (to avoid cluttering with stationary points)
+            if (trackPath.length === 0 || isSignificantMovement(trackPath[trackPath.length-1], newPoint)) {
+                trackPath.push(newPoint);
+                
+                // Update the polyline
+                trackPolyline.setPath(trackPath.map(point => ({ lat: point.lat, lng: point.lng })));
+                
+                // Center map on current location
+                map.setCenter(newPoint);
+                
+                // Update distance
+                updateTrackingDistance();
+            }
+        }
+        
+        // Check if movement is significant enough to record
+        function isSignificantMovement(lastPoint, newPoint) {
+            // Calculate distance between points
+            const distance = calculateDistance(
+                lastPoint.lat, lastPoint.lng,
+                newPoint.lat, newPoint.lng
+            );
+            
+            // Only consider it significant if moved more than 5 meters and accuracy is reasonable
+            return distance > 0.005 && newPoint.accuracy < 20;
+        }
+        
+        // Calculate distance between two points using Haversine formula
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; // Radius of the earth in km
+            const dLat = deg2rad(lat2 - lat1);
+            const dLon = deg2rad(lon2 - lon1);
+            const a = 
+                Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * 
+                Math.sin(dLon/2) * Math.sin(dLon/2); 
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+            const distance = R * c; // Distance in km
+            return distance;
+        }
+        
+        function deg2rad(deg) {
+            return deg * (Math.PI/180);
+        }
+        
+        // Update the tracking timer display
+        function updateTrackingTimer() {
+            const now = new Date();
+            const elapsedMs = now - trackStartTime - trackPausedTime;
+            const seconds = Math.floor((elapsedMs / 1000) % 60);
+            const minutes = Math.floor((elapsedMs / (1000 * 60)) % 60);
+            const hours = Math.floor(elapsedMs / (1000 * 60 * 60));
+            
+            document.getElementById('tracking-time').textContent = 
+                `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+        
+        // Update the tracking distance display
+        function updateTrackingDistance() {
+            if (trackPath.length < 2) return;
+            
+            let totalDistance = 0;
+            for (let i = 1; i < trackPath.length; i++) {
+                totalDistance += calculateDistance(
+                    trackPath[i-1].lat, trackPath[i-1].lng,
+                    trackPath[i].lat, trackPath[i].lng
+                );
+            }
+            
+            document.getElementById('tracking-distance').textContent = totalDistance.toFixed(2);
+        }
+        
+        // Save the track data
+        function saveTrackData() {
+            const title = document.getElementById('track-title').value.trim();
+            const description = document.getElementById('track-description').value.trim();
+            
+            if (!title) {
+                alert("Please enter a title for your track.");
+                return;
+            }
+            
+            // Create track object
+            const track = {
+                title: title,
+                description: description,
+                path: trackPath,
+                startTime: trackStartTime.getTime(),
+                endTime: new Date().getTime(),
+                distance: parseFloat(document.getElementById('tracking-distance').textContent)
+            };
+            
+            // Save to localStorage
+            const savedTracks = JSON.parse(localStorage.getItem('savedTracks')) || [];
+            savedTracks.push(track);
+            localStorage.setItem('savedTracks', JSON.stringify(savedTracks));
+            
+            // Reset tracking and UI
+            resetTracking();
+            document.getElementById('track-form').style.display = 'none';
+            
+            // Reload tracks to display the new one
+            loadSavedTracks();
+            
+            alert("Track saved successfully!");
+        }
+        
+        // Discard the current track
+        function discardTrack() {
+            if (confirm("Are you sure you want to discard this track?")) {
+                resetTracking();
+                document.getElementById('track-form').style.display = 'none';
+            }
+        }
+        
+        // Reset tracking state
+        function resetTracking() {
+            isTracking = false;
+            trackPath = [];
+            trackStartTime = null;
+            trackPausedTime = 0;
+            
+            if (trackPolyline) {
+                trackPolyline.setMap(null);
+                trackPolyline = null;
+            }
+            
+            // Reset UI
+            document.getElementById('start-tracking').style.display = 'inline';
+            document.getElementById('pause-tracking').style.display = 'none';
+            document.getElementById('stop-tracking').style.display = 'none';
+            document.getElementById('tracking-info').style.display = 'none';
+        }
+        
+        // Load saved tracks from localStorage
+        function loadSavedTracks() {
+            const savedTracks = JSON.parse(localStorage.getItem('savedTracks')) || [];
+            
+            // Clear existing track polylines (not markers)
+            if (window.trackPolylines) {
+                window.trackPolylines.forEach(polyline => polyline.setMap(null));
+            }
+            window.trackPolylines = [];
+            
+            // Display each track
+            savedTracks.forEach(track => {
+                const path = track.path.map(point => ({ lat: point.lat, lng: point.lng }));
+                
+                // Create a polyline for the track
+                const polyline = new google.maps.Polyline({
+                    path: path,
+                    strokeColor: getRandomColor(),
+                    strokeOpacity: 0.7,
+                    strokeWeight: 4,
+                    map: map
+                });
+                
+                // Add click listener to show track info
+                polyline.addListener('click', () => {
+                    const infoWindow = new google.maps.InfoWindow({
+                        content: `
+                            <div>
+                                <h3>${track.title}</h3>
+                                <p>${track.description || ''}</p>
+                                <p>Distance: ${track.distance.toFixed(2)} km</p>
+                                <p>Date: ${new Date(track.startTime).toLocaleDateString()}</p>
+                            </div>
+                        `
+                    });
+                    
+                    infoWindow.open(map, {
+                        position: path[Math.floor(path.length / 2)]
+                    });
+                });
+                
+                window.trackPolylines.push(polyline);
+            });
+        }
+        
+        // Generate a random color for track polylines
+        function getRandomColor() {
+            const letters = '0123456789ABCDEF';
+            let color = '#';
+            for (let i = 0; i < 6; i++) {
+                color += letters[Math.floor(Math.random() * 16)];
+            }
+            return color;
         }
     </script>
     
