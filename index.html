@@ -405,9 +405,6 @@
             document.getElementById('pin-form').style.display = 'block';
             document.getElementById('pin-title').value = '';
             document.getElementById('pin-description').value = '';
-
-            // Alert the user to click on the map
-            alert("Click on the map to place your pin!");
         }
 
         // Save pin data when the save button is clicked
@@ -425,6 +422,9 @@
                 return;
             }
 
+            // Create a unique ID for this marker
+            const markerId = 'pin_' + new Date().getTime();
+            
             // Create an actual marker
             const marker = new google.maps.Marker({
                 position: tempMarker.getPosition(),
@@ -433,9 +433,25 @@
                 animation: google.maps.Animation.DROP
             });
 
-            // Create an info window with pin information
+            // Store the description and ID with the marker
+            marker.set('description', description);
+            marker.set('markerId', markerId);
+
+            // Create an info window with pin information and delete button
+            const infoContent = `
+                <div>
+                    <h3>${title}</h3>
+                    <p>${description}</p>
+                    <button 
+                        onclick="handlePinDelete('${markerId}')" 
+                        style="background-color: #f44336; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; margin-top: 8px;">
+                        Delete Pin
+                    </button>
+                </div>
+            `;
+            
             const infoWindow = new google.maps.InfoWindow({
-                content: `<div><h3>${title}</h3><p>${description}</p></div>`
+                content: infoContent
             });
 
             // Add event listener to open info window on click
@@ -490,6 +506,7 @@
                     return {
                         title: marker.title,
                         description: marker.get('description') || '',
+                        markerId: marker.get('markerId'),
                         position: {
                             lat: marker.getPosition().lat(),
                             lng: marker.getPosition().lng()
@@ -504,7 +521,10 @@
         function loadSavedPins() {
             const savedPins = JSON.parse(localStorage.getItem('savedPins')) || [];
 
-            savedPins.forEach(pin => {
+            savedPins.forEach((pin, index) => {
+                // Create a unique ID for this marker if it doesn't have one
+                const markerId = pin.markerId || 'saved_pin_' + index + '_' + new Date().getTime();
+                
                 const marker = new google.maps.Marker({
                     position: pin.position,
                     map: map,
@@ -512,12 +532,25 @@
                     animation: google.maps.Animation.DROP
                 });
 
-                // Store the description with the marker
+                // Store the description and ID with the marker
                 marker.set('description', pin.description);
+                marker.set('markerId', markerId);
 
-                // Create an info window with pin information
+                // Create an info window with pin information and delete button
+                const infoContent = `
+                    <div>
+                        <h3>${pin.title}</h3>
+                        <p>${pin.description}</p>
+                        <button 
+                            onclick="handlePinDelete('${markerId}')" 
+                            style="background-color: #f44336; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; margin-top: 8px;">
+                            Delete Pin
+                        </button>
+                    </div>
+                `;
+                
                 const infoWindow = new google.maps.InfoWindow({
-                    content: `<div><h3>${pin.title}</h3><p>${pin.description}</p></div>`
+                    content: infoContent
                 });
 
                 // Add event listener to open info window on click
@@ -899,6 +932,38 @@
             }
             return color;
         }
+
+        // Add a function to delete an individual pin
+        function deletePin(marker) {
+            // Remove the marker from the map
+            marker.setMap(null);
+            
+            // Remove the marker from the markers array
+            markers = markers.filter(m => m !== marker);
+            
+            // Update localStorage
+            savePinsToStorage();
+        }
+
+        // Add a global function to handle pin deletion
+        // This needs to be in the global scope to be callable from the InfoWindow HTML
+        window.handlePinDelete = function(markerId) {
+            if (confirm("Are you sure you want to delete this pin?")) {
+                // Find the marker with this ID
+                const markerToDelete = markers.find(m => m.get('markerId') === markerId);
+                
+                if (markerToDelete) {
+                    // Remove the marker from the map
+                    markerToDelete.setMap(null);
+                    
+                    // Remove the marker from the markers array
+                    markers = markers.filter(m => m.get('markerId') !== markerId);
+                    
+                    // Update localStorage
+                    savePinsToStorage();
+                }
+            }
+        };
     </script>
 
     <!-- Load Google Maps API -->
