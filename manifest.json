@@ -1,6 +1,6 @@
 {
-  "name": "Location Mapper",
-  "short_name": "Mapper",
+  "name": "IB Wandering",
+  "short_name": "IB Wandering",
   "description": "Map your current location and add custom pins with labels",
   "start_url": "/index.html",
   "display": "standalone",
